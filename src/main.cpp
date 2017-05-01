@@ -38,96 +38,99 @@ uint8_t const pins[] = { D0, D1, D2, D3, D4, D5, D6, D7, D8 };
 #define POLL_PERIOD 300000 /*  5m */
 
 void print_P(char const * pstr) {
-  size_t const BUF_SIZE = 128;
-  char buf[BUF_SIZE];
-  strncpy_P(buf, pstr, BUF_SIZE);
-  Serial.print(buf);
+    size_t const BUF_SIZE = 128;
+    char buf[BUF_SIZE];
+    strncpy_P(buf, pstr, BUF_SIZE);
+    Serial.print(buf);
 }
 
 void println_P(char const * pstr) {
-  print_P(pstr);
-  Serial.print('\n');
+    print_P(pstr);
+    Serial.print('\n');
 }
 
 void setup() {
-  for (auto pin : pins) {
-    pinMode(pin, OUTPUT);
-    digitalWrite(pin, 1);
-  }
+    for (auto pin : pins) {
+        pinMode(pin, OUTPUT);
+        digitalWrite(pin, 1);
+    }
 
-  Serial.begin(115200);
-  println_P(PSTR("\n\nInitializing"));
+    Serial.begin(115200);
+    println_P(PSTR("\n\nInitializing"));
 
-  for (auto pin : pins) {
-    digitalWrite(pin, 0);
-  }
+    for (auto pin : pins) {
+        digitalWrite(pin, 0);
+    }
 }
 
 void connectWiFi() {
-  print_P(PSTR("Connecting to WiFi..."));
+    print_P(PSTR("Connecting to WiFi..."));
 
-  WiFi.begin(CONFIG_SSID, CONFIG_PASSWORD);
+    WiFi.begin(CONFIG_SSID, CONFIG_PASSWORD);
 
-  // TODO: handle failure
-  bool flashState = true;
-  while (WiFi.status() != WL_CONNECTED) {
-    digitalWrite(WIFI_LED, flashState);
-    delay(50);
-    flashState = !flashState;
-  }
+    bool flashState = false;
+    while (1) {
+        switch (WiFi.status()) {
+            case WL_CONNECTED:
+                break;
+        }
 
-  digitalWrite(WIFI_LED, 1);
+        digitalWrite(WIFI_LED, (flashState = !flashState));
+        delay(50);
+    }
 
-  print_P(PSTR("Connected, IP address: "));
-  Serial.println(WiFi.localIP().toString().c_str());
+    digitalWrite(WIFI_LED, 1);
+
+    print_P(PSTR("Connected, IP address: "));
+    Serial.println(WiFi.localIP().toString().c_str());
 }
 
 void disconnectWiFi() {
-  WiFi.disconnect(true);
-  digitalWrite(WIFI_LED, 1);
+    WiFi.disconnect(true);
+    digitalWrite(WIFI_LED, 1);
 }
 
 String fetchWeatherJson() {
-  connectWiFi();
+    connectWiFi();
 
-  HTTPClient client;
-  client.begin("http://api.wunderground.com/api/"
-               CONFIG_APIKEY
-               "/conditions/q/"
-               CONFIG_LOCATION
-               ".json");
-  println_P(PSTR("Fetching JSON"));
-  int httpCode = client.GET();
+    HTTPClient client;
+    client.begin("http://api.wunderground.com/api/"
+                 CONFIG_APIKEY
+                 "/conditions/q/"
+                 CONFIG_LOCATION
+                 ".json");
+    println_P(PSTR("Fetching JSON"));
+    int httpCode = client.GET();
 
-  if (httpCode > 0) {
-    print_P(PSTR("HTTP GET code: "));
-    Serial.println(httpCode);
-    if (httpCode == HTTP_CODE_OK) {
-      return client.getString();
+    if (httpCode > 0) {
+        print_P(PSTR("HTTP GET code: "));
+        Serial.println(httpCode);
+        if (httpCode == HTTP_CODE_OK) {
+            return client.getString();
+        }
+    } else {
+        print_P(PSTR("HTTP GET failure: "));
+        Serial.println(client.errorToString(httpCode));
+        digitalWrite(ERROR_LED, 1);
     }
-  } else {
-    print_P(PSTR("HTTP GET failure: "));
-    Serial.println(client.errorToString(httpCode));
-    digitalWrite(ERROR_LED, 1);
-  }
 
-  client.end();
-  WiFi.disconnect(true);
+    client.end();
+    WiFi.disconnect(true);
 }
 
 void loop() {
-  println_P(PSTR("\nUpdating weather"));
-  Serial.flush();
+    println_P(PSTR("\nUpdating weather"));
+    Serial.flush();
 
-  auto json = fetchWeatherJson();
-  DynamicJsonBuffer buffer;
-  println_P(PSTR("Parsing JSON"));
-  auto const & root = buffer.parseObject(json);
-  auto const & current = root["current_observation"].as<JsonObject>();
-  auto const & description = current["weather"];
-  auto const & icon = current["icon"];
-  if (description.is<char const *>() &&
-      icon.is<char const *>()) {
+    auto json = fetchWeatherJson();
+    DynamicJsonBuffer buffer;
+    println_P(PSTR("Parsing JSON"));
+    auto const & root = buffer.parseObject(json);
+    auto const & current = root["current_observation"].as<JsonObject>();
+    auto const & description = current["weather"];
+    auto const & icon = current["icon"];
+    if (description.is<char const *>() &&
+        icon.is<char const *>()) {
         print_P(PSTR("The weather is "));
         Serial.println(description.as<char const *>());
         auto weather = getWeather(icon.as<char const *>());
@@ -136,12 +139,12 @@ void loop() {
         println_P(weatherName(weather));
         digitalWrite(ERROR_LED, 0);
         digitalWrite(FETCHED_LED, 1);
-  } else {
-    println_P(PSTR("Something's wrong:"));
-    root.prettyPrintTo(Serial);
-    digitalWrite(ERROR_LED, 1);
-  }
+    } else {
+        println_P(PSTR("Something's wrong:"));
+        root.prettyPrintTo(Serial);
+        digitalWrite(ERROR_LED, 1);
+    }
 
-  //while (1)
-  delay(POLL_PERIOD);
+    //while (1)
+    delay(POLL_PERIOD);
 }

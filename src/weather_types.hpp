@@ -1,14 +1,14 @@
 #pragma once
 
 enum class Weather {
-  Cloud,
-  Rain,
-  Snow,
-  Storm,
-  Clear,
-  PartCloud,
-  Lightning,
-  Unknown
+    Cloud,
+    Rain,
+    Snow,
+    Storm,
+    Clear,
+    PartCloud,
+    Lightning,
+    Unknown
 };
 
 // Gets the string name of the weather enum value
